@@ -1,3 +1,4 @@
+# Base image updated to Ubuntu 22.04
 FROM ubuntu:22.04 AS main-setup
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -10,7 +11,7 @@ ENV ROS_DISTRO=humble \
 RUN echo 'Etc/UTC' > /etc/timezone && \
     ln -s /usr/share/zoneinfo/Etc/UTC /etc/localtime
 
-###################################### user #####################################
+###################################### User Setup #####################################
 RUN adduser --disabled-password \
 --gecos "Default user" \
 --uid ${NB_UID} \
@@ -21,7 +22,7 @@ RUN echo "root:root" | chpasswd \
 
 ENV HOME=/home/${NB_USER}
 
-###################################### basic #####################################
+###################################### Basic Tools #####################################
 RUN apt-get update && \
     apt-get install -q -y --no-install-recommends \
     ccache \
@@ -32,11 +33,11 @@ RUN apt-get update && \
     make \
     ninja-build \
     python3-numpy \
-    python3-dev \
-    python3-pyparsing \
-    python3-serial \
+    python3.11 \
+    python3.11-dev \
+    python3.11-distutils \
+    libpython3.11-stdlib \
     python-is-python3 \
-    libpython3-stdlib \
     libtool-bin \
     zip \
     default-jre \
@@ -70,10 +71,10 @@ RUN apt-get update && \
     software-properties-common \
     && rm -rf /var/lib/apt/lists/*
 
-###################################### python pkg###############################
-RUN apt-get update && apt-get upgrade pip -y && \
-    pip install --upgrade pip && \
-    pip install \
+###################################### Python Packages ##################################
+RUN apt-get update && apt-get install -y python3-pip && \
+    python3.11 -m pip install --upgrade pip && \
+    python3.11 -m pip install \
     numpy \
     scipy \
     matplotlib \
@@ -93,10 +94,9 @@ RUN apt-get update && apt-get upgrade pip -y && \
     tensorflow \
     future
 
-################################## torch gymnasium sb3 #####################################
-RUN python3 -m pip install --upgrade pip && \
-    python3 -m pip install --no-cache-dir --ignore-installed PyYAML && \
-    python3 -m pip install \
+################################## Torch, Gymnasium, and SB3 ##################################
+RUN python3.11 -m pip install --no-cache-dir --ignore-installed PyYAML && \
+    python3.11 -m pip install \
     torch \
     torchaudio \
     torchvision \
@@ -113,7 +113,7 @@ RUN python3 -m pip install --upgrade pip && \
     opencv-python-headless \
     timm
 
-###################################### ros2 ####################################
+###################################### ROS 2 ####################################
 RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null && \
     apt-get update && apt-get install -y --no-install-recommends \
@@ -150,7 +150,8 @@ RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o 
 RUN cd /opt && git clone -b ros2 https://github.com/mavlink/mavros.git && \
     cd mavros/mavros/scripts && \
     ./install_geographiclib_datasets.sh
-###################################### gazebo ##################################
+
+###################################### Gazebo ##################################
 RUN curl https://packages.osrfoundation.org/gazebo.gpg --output /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null && \
     apt-get update && \
@@ -165,7 +166,8 @@ RUN curl https://packages.osrfoundation.org/gazebo.gpg --output /usr/share/keyri
     rm -rf /var/lib/apt/lists/* && \
     rosdep init && \
     rosdep update
-###################################### microxrceddsgen ####################################
+
+###################################### Micro XRCE-DDS Gen ####################################
 FROM eclipse-temurin:19-jdk-jammy AS dds-gen-builder
 RUN apt-get update && apt-get install --no-install-recommends -y \
     git \
@@ -190,3 +192,6 @@ ENV PATH="/usr/local/dds-gen/scripts:$PATH"
 # Set the buildlogs directory into /tmp as other directories aren't accessible
 ENV BUILDLOGS=/tmp/buildlogs
 ENV TZ=UTC
+
+###################################### FreeTAKServer ####################################
+RUN python3.11 -m pip install FreeTAKServer[ui]
